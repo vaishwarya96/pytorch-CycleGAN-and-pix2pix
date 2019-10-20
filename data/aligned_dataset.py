@@ -36,6 +36,7 @@ class AlignedDataset(BaseDataset):
             A_paths (str) - - image paths
             B_paths (str) - - image paths (same as A_paths)
         """
+
         # read a image given a random integer index
         AB_path = self.AB_paths[index]
         AB = Image.open(AB_path).convert('RGB')
