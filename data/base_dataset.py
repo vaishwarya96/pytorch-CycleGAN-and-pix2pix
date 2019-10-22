@@ -97,8 +97,8 @@ def get_transform(opt, params=None, grayscale=False, method=Image.BICUBIC, conve
     if opt.preprocess == 'none':
         transform_list.append(transforms.Lambda(lambda img: __make_power_2(img, base=4, method=method)))
 
-    if opt.color_jitter == True:
-        transform_list.append(transforms.ColorJitter(brightness=1))
+   # if opt.color_jitter == True:
+   #     transform_list.append(transforms.ColorJitter(brightness=1))
     if not opt.no_flip:
         if params is None:
             transform_list.append(transforms.RandomHorizontalFlip())
