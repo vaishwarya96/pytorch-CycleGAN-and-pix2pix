@@ -5,7 +5,8 @@ so that this class can load images from both current directory and its subdirect
 """
 
 import torch.utils.data as data
-
+import cv2
+import PIL
 from PIL import Image
 import os
 import os.path

@@ -1,8 +1,9 @@
 import os.path
-from data.base_dataset import BaseDataset, get_params, get_transform
+from data.base_dataset import BaseDataset, get_params, get_transform, get_modified_transform
 from data.image_folder import make_dataset
 from PIL import Image
-
+import cv2
+import torch
 
 class AlignedDataset(BaseDataset):
     """A dataset class for paired image dataset.
@@ -39,20 +40,44 @@ class AlignedDataset(BaseDataset):
 
         # read a image given a random integer index
         AB_path = self.AB_paths[index]
-        AB = Image.open(AB_path).convert('RGB')
+
+        AB = cv2.imread(AB_path, -1)
+        w, h, c = AB.shape
+        #AB = Image.open(AB_path).convert('RGB')
         # split AB image into A and B
-        w, h = AB.size
-        w2 = int(w / 2)
-        A = AB.crop((0, 0, w2, h))
-        B = AB.crop((w2, 0, w, h))
+        #w, h = AB.size
+        #w2 = int(w / 2)
+        #A = AB.crop((0, 0, w2, h))
+        #B = AB.crop((w2, 0, w, h))
+
+        h2 = int(h/2)
+        A = AB[0:w, 0:h2, :]
+        B = AB[0:w, h2:h, :]
+        A = A/255/255
+        B = B/255
+
+        #pixels = list(A.getdata())
+        #print(pixels)
 
         # apply the same transform to both A and B
-        transform_params = get_params(self.opt, A.size)
-        A_transform = get_transform(self.opt, transform_params, grayscale=(self.input_nc == 1))
-        B_transform = get_transform(self.opt, transform_params, grayscale=(self.output_nc == 1))
+        transform_params = get_params(self.opt, A.shape)
+        
+        if self.opt.phase == 'train':
+            self.opt.color_jitter = False;
+            A_transform = get_modified_transform(self.opt, A, transform_params, grayscale=(self.input_nc == 1))
+            self.opt.color_jitter = True;
+            B_transform = get_modified_transform(self.opt, B, transform_params, grayscale=(self.output_nc == 1))
 
-        A = A_transform(A)
-        B = B_transform(B)
+        else:
+            A_transform = get_modified_transform(self.opt, A, transform_params, grayscale=(self.input_nc == 1))
+            B_transform = get_modified_transform(self.opt, B, transform_params, grayscale=(self.output_nc == 1))
+        
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+        A = torch.from_numpy(A_transform).float()
+        B = torch.from_numpy(B_transform).float()
+       # A = A_transform(A)
+       # B = B_transform(B)
 
         return {'A': A, 'B': B, 'A_paths': AB_path, 'B_paths': AB_path}
 

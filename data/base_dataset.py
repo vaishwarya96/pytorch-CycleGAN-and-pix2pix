@@ -8,7 +8,8 @@ import torch.utils.data as data
 from PIL import Image
 import torchvision.transforms as transforms
 from abc import ABC, abstractmethod
-
+import cv2
+from random import randrange
 
 class BaseDataset(data.Dataset, ABC):
     """This class is an abstract base class (ABC) for datasets.
@@ -61,7 +62,7 @@ class BaseDataset(data.Dataset, ABC):
 
 
 def get_params(opt, size):
-    w, h = size
+    w, h ,c = size
     new_h = h
     new_w = w
     if opt.preprocess == 'resize_and_crop':
@@ -77,6 +78,26 @@ def get_params(opt, size):
 
     return {'crop_pos': (x, y), 'flip': flip}
 
+
+def get_modified_transform(opt, img, params = None, grayscale = False, convert = True):
+    
+    if 'resize' in opt.preprocess:
+        osize = (opt.load_size, opt.load_size)
+        img = cv2.resize(img, dsize = osize, interpolation = cv2.INTER_CUBIC)
+
+    if opt.color_jitter == True:
+        #Brightness
+        img = img * random.uniform(0.5 , 1.5) 
+
+    if not opt.no_flip:
+        if params is None:
+            n1 = randrange(10)
+            n2 = randrange(10)
+            if n1 > 4:           # Probability of flipping is 0.5
+                img = cv2.flip(img, 0)   #Flip along the X- axis
+            if n2 > 4:
+                img = cv2.flip(img, 1)   #Flip along y axis
+    return img
 
 def get_transform(opt, params=None, grayscale=False, method=Image.BICUBIC, convert=True):
     transform_list = []
@@ -97,8 +118,9 @@ def get_transform(opt, params=None, grayscale=False, method=Image.BICUBIC, conve
     if opt.preprocess == 'none':
         transform_list.append(transforms.Lambda(lambda img: __make_power_2(img, base=4, method=method)))
 
-   # if opt.color_jitter == True:
-   #     transform_list.append(transforms.ColorJitter(brightness=1))
+    if opt.color_jitter == True:
+        transform_list.append(transforms.ColorJitter(brightness=0.5, contrast = 0.5, saturation = 0.5, hue = 0.1))
+
     if not opt.no_flip:
         if params is None:
             transform_list.append(transforms.RandomHorizontalFlip())

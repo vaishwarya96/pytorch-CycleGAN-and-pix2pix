@@ -26,6 +26,8 @@ from util.visualizer import Visualizer
 import cv2
 import torchvision.transforms as transforms
 import matplotlib.pyplot as plt
+import PIL
+import numpy as np
 
 if __name__ == '__main__':
     opt = TrainOptions().parse()   # get training options
@@ -47,14 +49,17 @@ if __name__ == '__main__':
         #print(opt.epoch_count, opt.niter + opt.niter_decay + 1) 1, 201
         for i, data in enumerate(dataset):  # inner loop within one epoch
             
-            
+            ''' 
             pilTrans = transforms.ToPILImage()
             img = pilTrans(data['A'][0,:])
-            plt.imshow(img)
-            plt.savefig('/home/gpu_user/aishwarya/'+str(count)+'.png')
+            img.save('/home/localadmin/aishwarya/gan/A/'+str(count)+'.png')
 
+            img = pilTrans(data['B'][0,:])
+            #plt.imshow(img)
+            img.save('/home/localadmin/aishwarya/gan/B/'+str(count)+'.png')
+            
             count += 1
-        
+            '''
             
             iter_start_time = time.time()  # timer for computation per iteration
             if total_iters % opt.print_freq == 0:
