@@ -4,6 +4,8 @@ from data.image_folder import make_dataset
 from PIL import Image
 import cv2
 import torch
+import torchvision.transforms as transforms
+import numpy as np
 
 class AlignedDataset(BaseDataset):
     """A dataset class for paired image dataset.
@@ -54,28 +56,46 @@ class AlignedDataset(BaseDataset):
         A = AB[0:w, 0:h2, :]
         B = AB[0:w, h2:h, :]
         A = A/255/255
-        B = B/255
+        B = B/255/255
+        B.astype(np.uint16)
 
         #pixels = list(A.getdata())
         #print(pixels)
 
         # apply the same transform to both A and B
         transform_params = get_params(self.opt, A.shape)
-        
+
         if self.opt.phase == 'train':
-            self.opt.color_jitter = False;
+            self.opt.color_jitter = False
             A_transform = get_modified_transform(self.opt, A, transform_params, grayscale=(self.input_nc == 1))
-            self.opt.color_jitter = True;
+            self.opt.color_jitter = True
             B_transform = get_modified_transform(self.opt, B, transform_params, grayscale=(self.output_nc == 1))
 
         else:
+            self.opt.color_jitter = False
             A_transform = get_modified_transform(self.opt, A, transform_params, grayscale=(self.input_nc == 1))
             B_transform = get_modified_transform(self.opt, B, transform_params, grayscale=(self.output_nc == 1))
         
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        
 
-        A = torch.from_numpy(A_transform).float()
-        B = torch.from_numpy(B_transform).float()
+        norm_1 = transforms.Normalize((0.5,), (0.5,))
+        norm_3 = transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+
+        if self.opt.input_nc == 1:
+            A = torch.from_numpy(A_transform).float().unsqueeze(0)
+            A = norm_1(A)
+        else:
+            A = torch.from_numpy(A_transform.transpose((2,0,1))).float()
+            A = norm_3(A)
+
+        if self.opt.output_nc == 1:
+            B = torch.from_numpy(B_transform).float().unsqueeze(0)
+            B = norm_1(B)
+        else:
+            B = torch.from_numpy(B_transform.transpose((2,0,1))).float()
+            B = norm_3(B)
+        
        # A = A_transform(A)
        # B = B_transform(B)
 

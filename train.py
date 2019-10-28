@@ -28,6 +28,7 @@ import torchvision.transforms as transforms
 import matplotlib.pyplot as plt
 import PIL
 import numpy as np
+import torch
 
 if __name__ == '__main__':
     opt = TrainOptions().parse()   # get training options
@@ -60,7 +61,9 @@ if __name__ == '__main__':
             
             count += 1
             '''
-            
+
+            #torch.set_printoptions(precision=10)
+            #print(data)
             iter_start_time = time.time()  # timer for computation per iteration
             if total_iters % opt.print_freq == 0:
                 t_data = iter_start_time - iter_data_time

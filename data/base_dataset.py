@@ -81,13 +81,17 @@ def get_params(opt, size):
 
 def get_modified_transform(opt, img, params = None, grayscale = False, convert = True):
     
+    
+    if grayscale:
+        img = img[...,0]
+    
     if 'resize' in opt.preprocess:
         osize = (opt.load_size, opt.load_size)
         img = cv2.resize(img, dsize = osize, interpolation = cv2.INTER_CUBIC)
 
     if opt.color_jitter == True:
         #Brightness
-        img = img * random.uniform(0.5 , 1.5) 
+        img = img * random.uniform(0.5 , 2.0) 
 
     if not opt.no_flip:
         if params is None:
