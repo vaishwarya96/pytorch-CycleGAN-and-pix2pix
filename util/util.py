@@ -25,8 +25,12 @@ def tensor2im(input_image, imtype=np.uint16):
         if image_numpy.shape[0] == 1:  # grayscale to RGB
             image_numpy = np.tile(image_numpy, (3, 1, 1))
         '''
-        image_numpy = (np.transpose(image_numpy, (1, 2, 0)) + 1) / 2.0 *255 * 255   # post-processing: tranpose and scaling
-    
+        #print('output before denorm ',np.min(image_numpy), np.max(image_numpy))
+        #image_numpy = (np.transpose(image_numpy, (1, 2, 0)) *1876.27214) + 21176.97653  # post-processing: tranpose and scaling
+        max_val = 0.4335915
+        min_val = 0.08761398
+        image_numpy  = (np.transpose(image_numpy, (1, 2, 0)) + 1)/2.0 * 255 * 255
+        #image_numpy  = image_numpy*(max_val - min_val) + min_val
     else:  # if it is a numpy array, do nothing
         image_numpy = input_image
     

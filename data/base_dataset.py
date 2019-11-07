@@ -91,7 +91,7 @@ def get_modified_transform(opt, img, params = None, grayscale = False, convert =
 
     if opt.color_jitter == True:
         #Brightness
-        img = img * random.uniform(0.5 , 2.0) 
+        img = img * random.uniform(0.5 , 1.5) 
 
     if not opt.no_flip:
         if params is None:

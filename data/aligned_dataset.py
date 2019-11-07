@@ -55,20 +55,42 @@ class AlignedDataset(BaseDataset):
         h2 = int(h/2)
         A = AB[0:w, 0:h2, :]
         B = AB[0:w, h2:h, :]
-        A = A/255/255
-        B = B/255/255
-        B.astype(np.uint16)
+        
+        #A = A
+        #B = B
+        
+        mean = 21176.97653086236
+        std_dev = 1876.2721426829492
+        max_val = 65535
+        min_val = 0
+
+        #A = (A - mean)/std_dev
+        #B = (B - mean)/std_dev
+
+        A = A/255.0/255.0
+        B = B/255.0/255.0
+        #B = B/255.0/255.0
+        A = 2*A - 1
+        B = 2*B - 1
+        A = A.astype(float)
+        B = B.astype(float)
+        #A = cv2.normalize(A, None, alpha = -1, beta = 1, norm_type = cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+        #B = cv2.normalize(B, None, alpha = -1, beta = 1, norm_type = cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+        #print('shapes : ', A.shape, B.shape)
+        #print('type :   ', type(A), type(B))
+        #exit(0)
+        #B.astype(np.uint16)
 
         #pixels = list(A.getdata())
         #print(pixels)
 
         # apply the same transform to both A and B
         transform_params = get_params(self.opt, A.shape)
-
+        
         if self.opt.phase == 'train':
             self.opt.color_jitter = False
             A_transform = get_modified_transform(self.opt, A, transform_params, grayscale=(self.input_nc == 1))
-            self.opt.color_jitter = True
+            self.opt.color_jitter = False
             B_transform = get_modified_transform(self.opt, B, transform_params, grayscale=(self.output_nc == 1))
 
         else:
@@ -79,26 +101,36 @@ class AlignedDataset(BaseDataset):
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         
 
-        norm_1 = transforms.Normalize((0.5,), (0.5,))
-        norm_3 = transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-
+       # norm_1 = transforms.Normalize((0.5,), (0.5,))
+       # norm_3 = transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        
+        norm_1 = transforms.Normalize((mean,),(std_dev,))
+        norm_3 = transforms.Normalize((mean,mean,mean),(std_dev,std_dev,std_dev))
+        A_transform.astype(float)
+        B_transform.astype(float)
         if self.opt.input_nc == 1:
             A = torch.from_numpy(A_transform).float().unsqueeze(0)
-            A = norm_1(A)
+            #A = norm_1(A)
         else:
             A = torch.from_numpy(A_transform.transpose((2,0,1))).float()
-            A = norm_3(A)
+            #A = norm_3(A)
 
         if self.opt.output_nc == 1:
             B = torch.from_numpy(B_transform).float().unsqueeze(0)
-            B = norm_1(B)
+            #B = norm_1(B)
         else:
             B = torch.from_numpy(B_transform.transpose((2,0,1))).float()
-            B = norm_3(B)
+            #B = norm_3(B)
         
        # A = A_transform(A)
        # B = B_transform(B)
-
+        '''
+        print("min A", torch.min(A))
+        print("min B", torch.min(B))
+        print("max A", torch.max(A))
+        print("max B", torch.max(B))
+        '''
+        #print(A)
         return {'A': A, 'B': B, 'A_paths': AB_path, 'B_paths': AB_path}
 
     def __len__(self):
