@@ -1,7 +1,8 @@
 import torch
 from .base_model import BaseModel
 from . import networks
-
+import cv2
+import numpy as np
 
 class Pix2PixModel(BaseModel):
     """ This class implements the pix2pix model, for learning a mapping from input images to output images given paired data.
@@ -88,6 +89,25 @@ class Pix2PixModel(BaseModel):
     def forward(self):
         """Run forward pass; called by both functions <optimize_parameters> and <test>."""
         self.fake_B = self.netG(self.real_A)  # G(A)
+
+        y=torch.Tensor.cpu(self.fake_B).detach().numpy()[:,:,:,:]
+        y=y.transpose((3,2,1,0))
+
+        #Get the mask
+        mask_root = self.opt.mask_root
+        mask = cv2.imread(mask_root,-1)
+        mask = cv2.resize(mask, dsize=None, fx=0.5, fy=0.5)
+        batch_size = self.opt.batch_size
+        mask = np.stack((mask,)*batch_size, axis=-1)
+        mask_tensor_format = mask.transpose((3,2,0,1))
+        mask_tensor = torch.from_numpy(mask_tensor_format).to(self.device)
+
+        modified_img = mask_tensor * self.real_A
+        modified_img_1 = (1-mask_tensor) * self.fake_B
+        border_img = modified_img + modified_img_1
+
+        self.fake_B = border_img
+
 
     def backward_D(self):
         """Calculate GAN loss for the discriminator"""
