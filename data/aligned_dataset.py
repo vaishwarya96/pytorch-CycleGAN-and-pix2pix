@@ -6,6 +6,7 @@ import cv2
 import torch
 import torchvision.transforms as transforms
 import numpy as np
+import random
 
 class AlignedDataset(BaseDataset):
     """A dataset class for paired image dataset.
@@ -44,7 +45,14 @@ class AlignedDataset(BaseDataset):
         AB_path = self.AB_paths[index]
 
         AB = cv2.imread(AB_path, -1)
-        w, h, c = AB.shape
+        if len(AB.shape)==3:
+            w, h, c = AB.shape
+            h2 = int(h/2)
+            A = AB[0:w, 0:h2, :]
+            B = AB[0:w, h2:h, :]
+
+        else:
+            w,h = AB. shape
         #AB = Image.open(AB_path).convert('RGB')
         # split AB image into A and B
         #w, h = AB.size
@@ -52,13 +60,34 @@ class AlignedDataset(BaseDataset):
         #A = AB.crop((0, 0, w2, h))
         #B = AB.crop((w2, 0, w, h))
 
-        h2 = int(h/2)
-        A = AB[0:w, 0:h2, :]
-        B = AB[0:w, h2:h, :]
+            h2 = int(h/2)
+            A = AB[0:w, 0:h2]
+            B = AB[0:w, h2:h]
         
-        #A = A
-        #B = B
-        
+        #This is where you have to add the bands
+        '''
+        if self.opt.phase == 'train':
+            row_start = random.randint(0, h2)
+            col_start = random.randint(0, w)
+            row_end = random.randint(row_start, h2)
+            col_end = random.randint(col_start, w)
+            A[row_start:row_end, col_start:col_end] = 0
+        '''
+
+
+
+        C = A.copy()
+
+        if self.opt.input_nc == 1: 
+            mean = np.mean(A)
+            A[np.where(A==0)] = mean
+        else:
+            for i in range(3):
+                temp = A[:,:,i]
+                mean = np.mean(temp)
+                temp[np.where(temp==0)] = mean
+                A[:,:,i] = temp
+
         mean = 21176.97653086236
         std_dev = 1876.2721426829492
         max_val = 65535
@@ -66,23 +95,17 @@ class AlignedDataset(BaseDataset):
 
         #A = (A - mean)/std_dev
         #B = (B - mean)/std_dev
-
         A = A/255.0/255.0
         B = B/255.0/255.0
+        C = C/255.0/255.0
         #B = B/255.0/255.0
         A = 2*A - 1
         B = 2*B - 1
+        C = 2*C - 1
+
         A = A.astype(float)
         B = B.astype(float)
-        #A = cv2.normalize(A, None, alpha = -1, beta = 1, norm_type = cv2.NORM_MINMAX, dtype=cv2.CV_32F)
-        #B = cv2.normalize(B, None, alpha = -1, beta = 1, norm_type = cv2.NORM_MINMAX, dtype=cv2.CV_32F)
-        #print('shapes : ', A.shape, B.shape)
-        #print('type :   ', type(A), type(B))
-        #exit(0)
-        #B.astype(np.uint16)
-
-        #pixels = list(A.getdata())
-        #print(pixels)
+        C = C.astype(float)
 
         # apply the same transform to both A and B
         transform_params = get_params(self.opt, A.shape)
@@ -92,14 +115,17 @@ class AlignedDataset(BaseDataset):
             A_transform = get_modified_transform(self.opt, A, transform_params, grayscale=(self.input_nc == 1))
             self.opt.color_jitter = False
             B_transform = get_modified_transform(self.opt, B, transform_params, grayscale=(self.output_nc == 1))
+            C_transform = get_modified_transform(self.opt, C, transform_params, grayscale=(self.output_nc == 1))
 
         else:
             self.opt.color_jitter = False
             A_transform = get_modified_transform(self.opt, A, transform_params, grayscale=(self.input_nc == 1))
             B_transform = get_modified_transform(self.opt, B, transform_params, grayscale=(self.output_nc == 1))
-        
+            C_transform = get_modified_transform(self.opt, C, transform_params, grayscale=(self.output_nc == 1))
+
+
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        
+            
 
        # norm_1 = transforms.Normalize((0.5,), (0.5,))
        # norm_3 = transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
@@ -108,11 +134,17 @@ class AlignedDataset(BaseDataset):
         norm_3 = transforms.Normalize((mean,mean,mean),(std_dev,std_dev,std_dev))
         A_transform.astype(float)
         B_transform.astype(float)
+        C_transform.astype(float)
+
         if self.opt.input_nc == 1:
             A = torch.from_numpy(A_transform).float().unsqueeze(0)
+            C = torch.from_numpy(C_transform).float().unsqueeze(0)
+
             #A = norm_1(A)
         else:
             A = torch.from_numpy(A_transform.transpose((2,0,1))).float()
+            C = torch.from_numpy(C_transform.transpose((2,0,1))).float()
+
             #A = norm_3(A)
 
         if self.opt.output_nc == 1:
@@ -121,7 +153,6 @@ class AlignedDataset(BaseDataset):
         else:
             B = torch.from_numpy(B_transform.transpose((2,0,1))).float()
             #B = norm_3(B)
-        
        # A = A_transform(A)
        # B = B_transform(B)
         '''
@@ -130,8 +161,17 @@ class AlignedDataset(BaseDataset):
         print("max A", torch.max(A))
         print("max B", torch.max(B))
         '''
-        #print(A)
-        return {'A': A, 'B': B, 'A_paths': AB_path, 'B_paths': AB_path}
+        '''
+        mean_A_img = C.cpu().numpy()
+        for i in range(mean_A_img.shape[0]):
+            mean_A = np.mean(mean_A_img[i])
+            img = mean_A_img[i]
+            img[np.where(img == 0)] = mean_A
+            mean_A_img[i] = img
+
+        A = torch.from_numpy(mean_A_img)
+        '''
+        return {'A': A, 'B': B, 'C':C,  'A_paths': AB_path, 'B_paths': AB_path}
 
     def __len__(self):
         """Return the total number of images in the dataset."""

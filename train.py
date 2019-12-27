@@ -51,17 +51,16 @@ if __name__ == '__main__':
         #print(opt.epoch_count, opt.niter + opt.niter_decay + 1) 1, 201
         for i, data in enumerate(dataset):  # inner loop within one epoch
             
-            ''' 
+            '''
             pilTrans = transforms.ToPILImage()
             img = pilTrans(data['A'][0,:])
             img.save('/home/localadmin/aishwarya/gan/A/'+str(count)+'.png')
-
             img = pilTrans(data['B'][0,:])
             #plt.imshow(img)
             img.save('/home/localadmin/aishwarya/gan/B/'+str(count)+'.png')
-            
-            count += 1
             '''
+            count += 1
+            
 
             #torch.set_printoptions(precision=10)
             #print(data)

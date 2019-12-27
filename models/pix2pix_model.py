@@ -3,7 +3,7 @@ from .base_model import BaseModel
 from . import networks
 import cv2
 import numpy as np
-
+from torchvision import transforms
 class Pix2PixModel(BaseModel):
     """ This class implements the pix2pix model, for learning a mapping from input images to output images given paired data.
 
@@ -85,11 +85,22 @@ class Pix2PixModel(BaseModel):
         #print(self.real_A)
         self.real_B = input['B' if AtoB else 'A'].to(self.device)
         self.image_paths = input['A_paths' if AtoB else 'B_paths']
+        self.black_A = input['C'].to(self.device)
+        '''
+        mean_A_img = self.real_A.cpu().numpy()
+        for i in range(mean_A_img.shape[0]):
+            mean_A = np.mean(mean_A_img[i])
+            img = mean_A_img[i]
+            img[np.where(img == 0)] = mean_A
+            mean_A_img[i] = img
+            
+        self.real_A = torch.from_numpy(mean_A_img).to(self.device)
+        '''
 
     def forward(self):
         """Run forward pass; called by both functions <optimize_parameters> and <test>."""
         self.fake_B = self.netG(self.real_A)  # G(A)
-
+        '''
         y=torch.Tensor.cpu(self.fake_B).detach().numpy()[:,:,:,:]
         y=y.transpose((3,2,1,0))
 
@@ -97,17 +108,47 @@ class Pix2PixModel(BaseModel):
         mask_root = self.opt.mask_root
         mask = cv2.imread(mask_root,-1)
         mask = cv2.resize(mask, dsize=None, fx=0.5, fy=0.5)
-        batch_size = self.opt.batch_size
-        mask = np.stack((mask,)*batch_size, axis=-1)
-        mask_tensor_format = mask.transpose((3,2,0,1))
-        mask_tensor = torch.from_numpy(mask_tensor_format).to(self.device)
 
-        modified_img = mask_tensor * self.real_A
+        batch_size = self.real_A.shape[0]
+
+        if self.opt.output_nc == 1:
+            mask = np.stack((mask,)*batch_size, axis=-1)[:,:,0,:].reshape(256, 256, 1, batch_size)
+        else:
+            mask = np.stack((mask,)*batch_size, axis=-1)
+
+        mask_tensor_format = mask.transpose((3,2,0,1))
+
+        mask_tensor = torch.from_numpy(mask_tensor_format).to(self.device)
+        
+        modified_img = mask_tensor * self.real_B
         modified_img_1 = (1-mask_tensor) * self.fake_B
         border_img = modified_img + modified_img_1
 
         self.fake_B = border_img
+        '''
+    
+    def weighted_L1_loss(self, real_img, fake_img):
 
+        input_img = self.black_A
+        mask = ~(input_img == -1.0)
+        mask = mask.cpu().numpy()
+        batch_size = mask.shape[0]
+        img_size = mask.shape[2]
+
+        mask = mask[0,0,:,:]
+        mask = mask.astype(np.uint8)
+
+        cc, lbl = cv2.distanceTransformWithLabels(mask, cv2.DIST_L2, cv2.DIST_MASK_3, cv2.DIST_LABEL_CCOMP)
+        cost = ((cc + 1)**2/np.max(((cc+1)**2))*255).astype(np.uint8)
+        #cv2.imshow('cc', cost)
+        #cv2.waitKey()
+        cost = np.stack((cost,)*batch_size, axis=-1).reshape(batch_size, 1, img_size, img_size)
+        weight = torch.from_numpy(cost).to(self.device)
+        img_diff = torch.abs(real_img - fake_img)
+        l1_loss = torch.mean(weight * img_diff)
+        
+
+        return l1_loss
 
     def backward_D(self):
         """Calculate GAN loss for the discriminator"""
@@ -128,11 +169,12 @@ class Pix2PixModel(BaseModel):
         # First, G(A) should fake the discriminator
         fake_AB = torch.cat((self.real_A, self.fake_B), 1)
         pred_fake = self.netD(fake_AB)
-        self.loss_G_GAN = self.criterionGAN(pred_fake, True)
+        self.loss_G_GAN = self.criterionGAN(pred_fake, True) * 10.0 # self.opt.lambda_L1
         # Second, G(A) = B
         self.loss_G_L1 = self.criterionL1(self.fake_B, self.real_B) * self.opt.lambda_L1
+        self.loss_G_WL1 = self.weighted_L1_loss(self.real_B, self.fake_B) * self.opt.lambda_L1
         # combine loss and calculate gradients
-        self.loss_G = self.loss_G_GAN + self.loss_G_L1
+        self.loss_G = self.loss_G_GAN + self.loss_G_L1 + self.loss_G_WL1
         self.loss_G.backward()
 
     def optimize_parameters(self):
